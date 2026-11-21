@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#08130d">
+<title>GIF World</title>
+<style>
+:root{color-scheme:dark;--bg:#08130d;--panel:#102019;--line:#28513a;--green:#72f5aa;--muted:#a9c8b4}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f2fff6;font:16px system-ui,sans-serif}
+main{max-width:1000px;margin:auto;padding:18px 14px 48px}
+header{display:flex;align-items:center;gap:12px;margin:8px 0 18px}.logo{width:48px;height:48px;border-radius:15px;background:linear-gradient(135deg,#72f5aa,#16884e);display:grid;place-items:center;color:#062111;font-weight:900;font-size:25px}
+h1{font-size:25px;margin:0}header p,.muted{color:var(--muted);font-size:13px;margin:3px 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin:14px 0}
+.tabs,.categories{display:flex;gap:8px;overflow:auto;padding:4px 0 10px}
+button,.chip{border:0;border-radius:10px;padding:10px 13px;background:var(--green);color:#062111;font-weight:700;font-size:14px;cursor:pointer}
+button.secondary,.chip{background:#1b3928;color:#dfffea;border:1px solid #386448}
+button.danger{background:#572626;color:white}button:disabled{opacity:.5}
+.chip.active{background:var(--green);color:#062111}
+input,select,textarea{width:100%;padding:11px;border-radius:10px;border:1px solid #315b42;background:#07150d;color:#fff;font:inherit}
+label{display:block;margin:12px 0 6px;color:#c9e5d1;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px}
+.gifcard{background:#102019;border:1px solid var(--line);border-radius:13px;padding:9px;min-width:0}
+.gifcard img{width:100%;height:135px;object-fit:contain;background:#07150d;border-radius:9px}
+.gifcard strong{display:block;margin:8px 0;overflow-wrap:anywhere}
+.actions{display:flex;gap:6px;flex-wrap:wrap}.actions button{flex:1;padding:8px 9px;font-size:13px}
+.status{color:#c4e5ce;font-size:14px;white-space:pre-wrap;margin-top:9px}
+.hidden{display:none!important}.count{color:var(--muted);font-size:12px}
+.note{background:#292313;border:1px solid #6b5721;color:#ffe9a6;padding:12px;border-radius:12px;font-size:13px;line-height:1.5}
+h2{font-size:18px;margin:0 0 10px}
+@media(min-width:700px){.gifcard img{height:170px}}
+</style>
+</head>
+<body><main>
+<header><div class="logo">G</div><div><h1>GIF World</h1><p>अपनी पसंद की GIF देखें, डाउनलोड करें और शेयर करें</p></div></header>
+<div class="tabs">
+<button id="visitorTab">GIFs देखें</button>
+<button class="secondary" id="adminTab">Admin: GIF जोड़ें / हटाएँ</button>
+</div>
+<section id="visitor">
+<div class="categories" id="categories"></div>
+<p class="count" id="count"></p>
+<div class="grid" id="gallery"></div>
+<p class="status" id="empty">इस कैटेगरी में अभी GIF नहीं है। Admin से GIF जोड़ सकती हैं।</p>
+</section>
+<section id="admin" class="hidden">
+<div class="note"><b>ज़रूरी:</b> यह एक single-file, बिना सर्वर वाला संस्करण है। Admin स्क्रीन पर पासवर्ड सुरक्षा नहीं है। GIF जोड़ने/हटाने के बाद नीचे “अपडेट की index.html डाउनलोड करें” दबाएँ और GitHub पर पुरानी index.html की जगह नई फ़ाइल अपलोड करके Commit करें। GitHub पासवर्ड या OTP यहाँ कभी न डालें।</div>
+<div class="panel">
+<h2>नई GIF जोड़ें</h2>
+<label for="gifFiles">मोबाइल से GIF चुनें (एक या कई)</label><input id="gifFiles" type="file" accept="image/gif,.gif" multiple>
+<label for="gifTitle">GIF का नाम</label><input id="gifTitle" placeholder="जैसे: Cute Hello">
+<label for="gifCategory">कैटेगरी</label><select id="gifCategory"></select>
+<button id="addGif">चुनी हुई GIF जोड़ें</button><div class="status" id="addStatus"></div>
+</div>
+<div class="panel">
+<h2>मौजूदा GIFs सँभालें</h2>
+<label for="manageCategory">कैटेगरी चुनें</label><select id="manageCategory"></select>
+<div id="manageList"></div>
+</div>
+<div class="panel">
+<h2>वेबसाइट अपडेट करें</h2>
+<p class="muted">यह बटन तुम्हारे बदलावों वाली नई index.html फ़ाइल बनाएगा।</p>
+<button id="export">अपडेट की index.html डाउनलोड करें</button>
+<div class="status" id="exportStatus"></div>
+</div>
+</section>
+<p class="muted">GIF World · तुम्हारी GIF लाइब्रेरी</p>
+</main>
+<script>
+/*GIFWORLD_DATA_START*/
+const INITIAL_DATA = [];
+/*GIFWORLD_DATA_END*/
+const CATEGORY_NAMES = ["Hijabi Girl","Islamic","Flower","Anime","Cute","Funny","Friendship","Love","Attitude","Nature","Good Morning","Good Night","Wishes","Birthday","Motivation","Animals","Food","Butterfly","Rain & Weather","Text & Quotes"];
+let data = INITIAL_DATA.map(x=>({...x}));
+let activeCategory = CATEGORY_NAMES[0];
+const $=id=>document.getElementById(id);
+function safeText(s){return String(s??"")}
+function renderCategories(){
+  $("categories").innerHTML="";
+  CATEGORY_NAMES.forEach(name=>{
+    const b=document.createElement("button");b.className="chip"+(name===activeCategory?" active":"");b.textContent=name;
+    b.onclick=()=>{activeCategory=name;renderCategories();renderGallery()};$("categories").append(b);
+  });
+}
+function renderGallery(){
+  const items=data.filter(x=>x.cat===activeCategory);$("gallery").innerHTML="";
+  $("count").textContent=activeCategory+" · "+items.length+" GIF";
+  $("empty").classList.toggle("hidden",items.length>0);
+  items.forEach(item=>{
+    const card=document.createElement("article");card.className="gifcard";
+    const img=document.createElement("img");img.src=item.src;img.alt=item.title;
+    const name=document.createElement("strong");name.textContent=item.title;
+    const actions=document.createElement("div");actions.className="actions";
+    const dl=document.createElement("button");dl.textContent="Download";dl.onclick=()=>downloadGif(item);
+    const sh=document.createElement("button");sh.textContent="Share";sh.className="secondary";sh.onclick=()=>shareGif(item);
+    actions.append(dl,sh);card.append(img,name,actions);$("gallery").append(card);
+  });
+}
+function downloadGif(item){
+  const a=document.createElement("a");a.href=item.src;a.download=(item.title||"gif").replace(/[^\w\- ]/g,"").trim().replace(/\s+/g,"-")+".gif";document.body.append(a);a.click();a.remove();
+}
+async function shareGif(item){
+  try{
+    const r=await fetch(item.src);const blob=await r.blob();const file=new File([blob],(item.title||"gif")+".gif",{type:"image/gif"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:item.title});}
+    else if(navigator.share){await navigator.share({title:item.title,text:"GIF World से GIF"});}
+    else {downloadGif(item);alert("इस ब्राउज़र में Share उपलब्ध नहीं है, GIF डाउनलोड कर दी है।");}
+  }catch(e){if(e.name!=="AbortError"){downloadGif(item);alert("Share नहीं हो पाया, GIF डाउनलोड कर दी है।");}}
+}
+function fillSelects(){
+  ["gifCategory","manageCategory"].forEach(id=>{const s=$(id);s.innerHTML="";CATEGORY_NAMES.forEach(n=>{const o=document.createElement("option");o.value=n;o.textContent=n;s.append(o)})});
+}
+function renderManage(){
+  const cat=$("manageCategory").value;const list=$("manageList");list.innerHTML="";
+  const items=data.map((x,i)=>({...x,index:i})).filter(x=>x.cat===cat);
+  if(!items.length){list.textContent="इस कैटेगरी में अभी कोई GIF नहीं है।";return;}
+  items.forEach(item=>{
+    const row=document.createElement("div");row.style.cssText="display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #28513a";
+    const img=document.createElement("img");img.src=item.src;img.style.cssText="width:58px;height:58px;object-fit:contain;background:#07150d;border-radius:8px";
+    const info=document.createElement("div");info.style.flex="1";const b=document.createElement("b");b.textContent=item.title;const small=document.createElement("div");small.className="muted";small.textContent=item.cat;info.append(b,small);
+    const del=document.createElement("button");del.className="danger";del.textContent="हटाएँ";del.onclick=()=>{if(confirm("क्या यह GIF हटानी है?")){data.splice(item.index,1);renderManage();renderGallery()}};
+    const edit=document.createElement("button");edit.className="secondary";edit.textContent="नाम बदलें";edit.onclick=()=>{const v=prompt("GIF का नया नाम:",item.title);if(v&&v.trim()){data[item.index].title=v.trim();renderManage();renderGallery()}};
+    row.append(img,info,edit,del);list.append(row);
+  });
+}
+$("visitorTab").onclick=()=>{$("visitor").classList.remove("hidden");$("admin").classList.add("hidden");$("visitorTab").className="";$("adminTab").className="secondary"};
+$("adminTab").onclick=()=>{$("admin").classList.remove("hidden");$("visitor").classList.add("hidden");$("adminTab").className="";$("visitorTab").className="secondary";renderManage()};
+$("manageCategory").onchange=renderManage;
+$("addGif").onclick=async()=>{
+  const files=[...$("gifFiles").files],title=$("gifTitle").value.trim(),cat=$("gifCategory").value;
+  if(!files.length){$("addStatus").textContent="पहले GIF फ़ाइल चुनें।";return}
+  if(!title){$("addStatus").textContent="GIF का नाम लिखें।";return}
+  if(files.some(f=>!f.type.includes("gif")&&!f.name.toLowerCase().endsWith(".gif"))){$("addStatus").textContent="कृपया केवल GIF फ़ाइलें चुनें।";return}
+  try{
+    for(let i=0;i<files.length;i++){
+      const src=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(files[i])});
+      data.push({cat,title:files.length>1?title+" "+(i+1):title,src});
+    }
+    $("addStatus").textContent=files.length+" GIF जोड़ दी गईं। अब अपडेट की फ़ाइल डाउनलोड करें।";
+    $("gifFiles").value="";$("gifTitle").value="";renderManage();renderGallery();
+  }catch(e){$("addStatus").textContent="GIF पढ़ी नहीं जा सकी।"}
+};
+$("export").onclick=()=>{
+  try{
+    const marker=/\/\*GIFWORLD_DATA_START\*\/[\s\S]*?\/\*GIFWORLD_DATA_END\*\//;
+    const replacement="/*GIFWORLD_DATA_START*/\nconst INITIAL_DATA = "+JSON.stringify(data)+";\n/*GIFWORLD_DATA_END*/";
+    const page=document.documentElement.outerHTML;
+    if(!marker.test(page))throw Error("डेटा स्थान नहीं मिला");
+    const updated="<!doctype html>\n"+page.replace(marker,replacement);
+    const blob=new Blob([updated],{type:"text/html;charset=utf-8"});const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download="index.html";a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+    $("exportStatus").textContent="नई index.html डाउनलोड हो गई। इसे GitHub पर पुरानी index.html की जगह अपलोड करके Commit करें।";
+  }catch(e){$("exportStatus").textContent="फ़ाइल नहीं बनी: "+e.message}
+};
+fillSelects();renderCategories();renderGallery();renderManage();
+</script>
+</body></html>
